@@ -1,0 +1,83 @@
+#Now, for the configuration. 
+#Above I will be creating a port channel 10 using interfaces eth1 and 2. 
+#Note this config has to go on both switches.
+
+
+config t
+int eth1-2
+channel-group 10 mode act
+int po10
+switchport mode trunk
+
+#Next, for the MLAG config. This also goes on both switches.
+
+vlan 4094
+trunk group mlagpeer
+int po10
+switchport trunk group mlagpeer
+exit
+no spanning-tree vlan4094
+
+#Now for the individual configuration. Lets start with vEOS-2…
+
+interface Vlan4094
+ip address 10.0.0.1/30
+mlag configuration
+domain-id mlag1
+local-interface Vlan4094
+peer-address 10.0.0.2
+peer-link Port-Channel10
+
+#And for vEOS-3
+
+interface Vlan4094
+ip address 10.0.0.2/30
+mlag configuration
+domain-id mlag1
+local-interface Vlan4094
+peer-address 10.0.0.1
+peer-link Port-Channel10
+
+#Done! Now all we need to do is verify if the MLAG is up. 
+#A simple #show mlag will do this for us. 
+#Note the other options we have by using the ? mark
+
+#vEOS-3#show mlag
+#MLAG Configuration:
+#domain-id : mlag1
+#local-interface : Vlan4094
+#peer-address : 10.0.0.1
+#peer-link : Port-Channel10
+#peer-config : consistent
+
+#MLAG Status:
+#state : Active
+#negotiation status : Connected
+#peer-link status : Up
+#local-int status : Up
+#system-id : 02:0c:29:24:2e:40
+
+#MLAG Ports:
+#Disabled : 0
+#Configured : 0
+#Inactive : 0
+#Active-partial : 0
+#Active-full : 1
+
+
+#we’ll need to make a MLAG enabled Portchannel. This is fairly easy to do on both switches…
+
+interface Ethernet3
+channel-group 3 mode active
+interface Port-Channel3
+mlag 3
+
+#Now on vEOS-4, all we need to do is off eth1 and 2 interface, simply create a regular port channel pointing up to the MLAG.
+
+interface Port-Channel3
+!
+interface Ethernet1
+channel-group 3 mode active
+!
+interface Ethernet2
+channel-group 3 mode active
